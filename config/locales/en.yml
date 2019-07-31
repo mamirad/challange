@@ -1,0 +1,16 @@
+en:
+
+  admin:
+
+    charities:
+      index:
+        title: "All Charities"
+      new:
+        title: "Add a Charity"
+        link: "New charity"
+
+  website:
+    donate:
+      link: "Donate"
+      success: "Success you've donated some money money money."
+      failure: "It seems like this didn't work so well. Try again maybe?"

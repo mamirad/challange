@@ -1,0 +1,107 @@
+require "test_helper"
+
+class WebsiteTest < ActionDispatch::IntegrationTest
+  test "should get index" do
+    get "/"
+
+    assert_response :success
+  end
+
+  test "that someone can't donate to no charity" do
+    post(donate_path, params: {
+      amount: "100", omise_token: "tokn_X", charity: ""
+    })
+
+    assert_template :index
+    assert_equal t("website.donate.failure"), flash.now[:alert]
+  end
+
+  test "that someone can't donate 0 to a charity" do
+    charity = charities(:children)
+    post(donate_path, params: {
+      amount: "0", omise_token: "tokn_X", charity: charity.id
+    })
+
+    assert_template :index
+    assert_equal t("website.donate.failure"), flash.now[:alert]
+  end
+
+  test "that someone can't donate less than 20 to a charity" do
+    charity = charities(:children)
+    post(donate_path, params: {
+      amount: "19", omise_token: "tokn_X", charity: charity.id
+    })
+
+    assert_template :index
+    assert_equal t("website.donate.failure"), flash.now[:alert]
+  end
+
+  test "that someone can't donate without a token" do
+    charity = charities(:children)
+    post(donate_path, params: {
+      amount: "100", charity: charity.id
+    })
+
+    assert_template :index
+    assert_equal t("website.donate.failure"), flash.now[:alert]
+  end
+
+  test "that someone can donate to a charity" do
+    charity = charities(:children)
+    initial_total = charity.total
+    expected_total = initial_total + (100 * 100)
+
+    post(donate_path, params: {
+      amount: "100", omise_token: "tokn_X", charity: charity.id
+    })
+    follow_redirect!
+
+    assert_template :index
+    assert_equal t("website.donate.success"), flash[:notice]
+    assert_equal expected_total, charity.reload.total
+  end
+
+  test "that if the charge fail from omise side it shows an error" do
+    charity = charities(:children)
+
+    # 999 is used to set paid as false
+    post(donate_path, params: {
+      amount: "999", omise_token: "tokn_X", charity: charity.id
+    })
+
+    assert_template :index
+    assert_equal t("website.donate.failure"), flash.now[:alert]
+  end
+
+  test "that we can donate to a charity at random" do
+    charities = Charity.all
+    initial_total = charities.to_a.sum(&:total)
+    expected_total = initial_total + (100 * 100)
+
+    post(donate_path, params: {
+      amount: "100", omise_token: "tokn_X", charity: "random"
+    })
+
+    assert_template :index
+    assert_equal expected_total, charities.to_a.map(&:reload).sum(&:total)
+    assert_equal t("website.donate.success"), flash[:notice]
+  end
+
+  test "that  allow subunits in the amount field" do
+    charity = charities(:children)
+    charge = Omise::Charge.create({
+      amount: 100,
+      currency: "THB",
+      card: "tokn_X",
+      description: "Donation to #{charity.name} [#{charity.id}]",
+    })
+    if charge.paid
+      charity.credit_amount(charge.amount)
+      assert_template :/
+      assert_equal t("website.donate.success"), flash.now[:notice]
+    else
+      assert_template :index
+      assert_equal t("website.donate.failure"), flash.now[:alert]
+    end
+  end
+end

@@ -1,0 +1,9 @@
+<%= t(".title") %>
+
+<ul>
+  <% @charities.each do |charity| %>
+    <li><%= charity.name %> (<%= m charity.total, charity.currency %>)</li>
+  <% end %>
+</ul>
+
+<%= link_to t("admin.charities.new.link"), new_admin_charity_path %>
